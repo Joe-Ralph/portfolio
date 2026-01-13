@@ -1,0 +1,90 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #050505;
+    /* Deep dark background */
+    font-family: 'Rajdhani',
+        sans-serif;
+    font-weight: 500;
+    touch-action: none;
+    /* Prevent default touch actions (scroll/zoom) */
+}
+
+#canvas-container {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+}
+
+/* Vignette for monitor feel */
+/* .vignette {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    background: radial-gradient(circle, transparent 50%, rgba(0, 0, 0, 0.2) 100%);
+} */
+
+#info-panel {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    color: #00ffff;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 2px;
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+    pointer-events: none;
+    opacity: 0.8;
+    user-select: none;
+}
+
+/* Custom Cursor */
+.custom-cursor {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #00ffff;
+    /* Cyan border */
+    background-color: rgba(0, 255, 255, 0.3);
+    /* Slight fill */
+    border-radius: 50%;
+    /* Circle default */
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    /* Pass through clicks */
+    z-index: 10000;
+    transition: width 0.3s ease, height 0.3s ease, border-radius 0.3s ease, background-color 0.3s ease;
+    box-shadow: 0 0 10px #00ffff;
+    mix-blend-mode: screen;
+}
+
+/* Hover State - Becomes a Hexagon */
+.custom-cursor.cursor-hover {
+    width: 35px;
+    height: 35px;
+    background-color: transparent;
+    border-radius: 0;
+    clip-path: polygon(50% 0, 100% 50%, 49% 49%, 50% 100%, 0 50%, 0% 0%);
+    /* clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); */
+    border: 0px;
+    background: rgba(0, 255, 255, 0.5);
+    box-shadow: 0 0 10px #00ffff;
+}
+
+@keyframes rotateCursor {
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+body {
+    cursor: none !important;
+}
