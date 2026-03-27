@@ -1,108 +1,41 @@
 {
     "id": "root",
-    "label": "JOHN DOE",
+    "label": "Joe Ralphin",
     "type": "root",
     "children": [
         {
-            "id": "about",
-            "label": "PROFILE",
+            "id": "experience",
+            "label": "EXPERIENCE",
             "type": "category",
             "children": [
                 {
-                    "id": "bio",
-                    "label": "Full Stack Eng.",
+                    "id": "volante",
+                    "label": "Volante SW Eng",
+                    "subLabel": "Mar 2024 - Present",
                     "type": "info"
                 },
                 {
-                    "id": "loc",
-                    "label": "San Francisco, CA",
-                    "type": "info"
-                }
-            ]
-        },
-        {
-            "id": "skills",
-            "label": "SKILLS",
-            "type": "category",
-            "children": [
-                {
-                    "id": "js",
-                    "label": "JavaScript / TS",
+                    "id": "gofrugal_tl",
+                    "label": "Gofrugal TL",
+                    "subLabel": "Apr 2023 - Jun 2023",
                     "type": "info"
                 },
                 {
-                    "id": "react",
-                    "label": "React & Three.js",
+                    "id": "gofrugal_mts",
+                    "label": "Gofrugal MTS",
+                    "subLabel": "May 2021 - Mar 2023",
                     "type": "info"
                 },
                 {
-                    "id": "backend",
-                    "label": "Node & Python",
+                    "id": "gofrugal_intern",
+                    "label": "Gofrugal Intern",
+                    "subLabel": "Mar 2021 - Apr 2021",
                     "type": "info"
                 },
                 {
-                    "id": "db",
-                    "label": "PostgreSQL",
-                    "type": "info"
-                },
-                {
-                    "id": "cloud",
-                    "label": "AWS",
-                    "type": "info"
-                },
-                {
-                    "id": "tools",
-                    "label": "Docker",
-                    "type": "info"
-                },
-                {
-                    "id": "design",
-                    "label": "Figma",
-                    "type": "info"
-                },
-                {
-                    "id": "soft",
-                    "label": "Leadership",
-                    "type": "info"
-                },
-                {
-                    "id": "more1",
-                    "label": "Java",
-                    "type": "info"
-                },
-                {
-                    "id": "more2",
-                    "label": "C++",
-                    "type": "info"
-                },
-                {
-                    "id": "more3",
-                    "label": "Rust",
-                    "type": "info"
-                },
-                {
-                    "id": "more4",
-                    "label": "Go",
-                    "type": "info"
-                },
-                {
-                    "id": "more5",
-                    "label": "Swift",
-                    "type": "info"
-                },
-                {
-                    "id": "more6",
-                    "label": "Kotlin",
-                    "type": "info"
-                },
-                {
-                    "id": "more7",
-                    "label": "PHP",
-                    "type": "info"
-                },
-                {
-                    "id": "more8",
-                    "label": "Ruby",
+                    "id": "guvi_intern",
+                    "label": "GUVI Intern",
+                    "subLabel": "Jul 2020 - Oct 2020",
                     "type": "info"
                 }
             ]
@@ -114,15 +47,98 @@
             "children": [
                 {
                     "id": "p1",
-                    "label": "Holo-UI",
-                    "type": "link",
-                    "url": "#"
+                    "label": "Smart Trash Bin",
+                    "subLabel": "IoT Patent",
+                    "type": "info"
                 },
                 {
                     "id": "p2",
-                    "label": "E-Commerce",
+                    "label": "Neduvaai",
+                    "subLabel": "IoT & Cloud",
                     "type": "link",
-                    "url": "#"
+                    "link": "https://neduvaai.joeralph.in/"
+                },
+                {
+                    "id": "p3",
+                    "label": "Coming Soon site",
+                    "subLabel": "Three.js",
+                    "type": "link",
+                    "link": "https://comingsoon.joeralph.in/"
+                },
+                {
+                    "id": "p4",
+                    "label": "Sha's Nutrition",
+                    "subLabel": "SvelteKit WebApp",
+                    "type": "link",
+                    "link": "https://sha-s-nutrition.web.app/"
+                }
+            ]
+        },
+        {
+            "id": "education",
+            "label": "EDUCATION",
+            "type": "category",
+            "children": [
+                {
+                    "id": "be",
+                    "label": "B.E. (NEC)",
+                    "subLabel": "2017 - 2021 | GPA: 8.4",
+                    "type": "info"
+                },
+                {
+                    "id": "hsc",
+                    "label": "HSC (12th)",
+                    "subLabel": "90.75%",
+                    "type": "info"
+                },
+                {
+                    "id": "sslc",
+                    "label": "SSLC (10th)",
+                    "subLabel": "95.2%",
+                    "type": "info"
+                }
+            ]
+        },
+        {
+            "id": "certifications",
+            "label": "CERTIFICATIONS",
+            "type": "category",
+            "children": [
+                {
+                    "id": "cka",
+                    "label": "CKA Cert",
+                    "subLabel": "CNCF",
+                    "type": "info"
+                },
+                {
+                    "id": "aws_devops",
+                    "label": "AWS DevOps",
+                    "subLabel": "AWS",
+                    "type": "info"
+                },
+                {
+                    "id": "react_cert",
+                    "label": "React Complete",
+                    "subLabel": "Udemy",
+                    "type": "info"
+                },
+                {
+                    "id": "patent",
+                    "label": "IoT Patent",
+                    "subLabel": "Patent No. 511059",
+                    "type": "info"
+                },
+                {
+                    "id": "hackerrank",
+                    "label": "SW Engineer",
+                    "subLabel": "HackerRank",
+                    "type": "info"
+                },
+                {
+                    "id": "azure",
+                    "label": "Azure DevOps",
+                    "subLabel": "Udemy",
+                    "type": "info"
                 }
             ]
         },
@@ -132,16 +148,34 @@
             "type": "category",
             "children": [
                 {
-                    "id": "email",
-                    "label": "email@dev.com",
-                    "type": "link",
-                    "url": "mailto:email@dev.com"
+                    "id": "phone",
+                    "label": "Phone Number",
+                    "subLabel": "+91 7448624486",
+                    "type": "info"
                 },
                 {
-                    "id": "gh",
+                    "id": "loc",
+                    "label": "Location",
+                    "subLabel": "Chennai, India",
+                    "type": "info"
+                },
+                {
+                    "id": "linkedin",
+                    "label": "LinkedIn",
+                    "type": "link",
+                    "link": "https://www.linkedin.com/in/joe-ralph/"
+                },
+                {
+                    "id": "github",
                     "label": "GitHub",
                     "type": "link",
-                    "url": "https://github.com"
+                    "link": "https://github.com/Joe-Ralph"
+                },
+                {
+                    "id": "email",
+                    "label": "Email",
+                    "type": "link",
+                    "link": "mailto:joeral333@gmail.com"
                 }
             ]
         },
@@ -149,8 +183,7 @@
             "id": "photo",
             "label": "PHOTO",
             "type": "image",
-            "image": "/assets/profile_placeholder.png",
-            "children": []
+            "image": "/assets/profile.jpg"
         }
     ]
 }

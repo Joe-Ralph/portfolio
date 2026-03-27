@@ -1,6 +1,7 @@
-import './style.css'
+import './style.css';
 import * as THREE from 'three';
 import gsap from 'gsap';
+import { analytics } from './firebase.js';
 
 // --- CONFIGURATION & SOUND HOOKS ---
 
@@ -8,36 +9,59 @@ const CONFIG = {
     hexRadius: 10,       // Size of the hexagon
     gap: 2,              // Gap between hexagons
     colors: {
-        default: 0x003366, // Deep Electric Blue
+        default: 0x1a5082, // Light teal — visible as a tint at low opacity
         hover: 0x00ffff,   // Bright Cyan
-        active: 0xffffff,  // White/Bright for selection
+        active: 0x00ffff,  // White/Bright for selection
         text: '#ffffff',
         glow: 0x00ffff     // Cyan Glow
     }
 };
 
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function synthBeep(freq, type, duration, vol) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    
+    filter.type = 'lowpass';
+    filter.frequency.value = 2500;
+    
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+}
+
 const SOUNDS = {
-    // To enable sounds, place mp3 files in public/sounds/ and uncomment lines below
     hover: () => {
-        // const audio = new Audio('/sounds/hover.mp3');
-        // audio.volume = 0.2;
-        // audio.play().catch(e => {}); 
+        synthBeep(1200, 'sine', 0.05, 0.05); // Soft glassy tap
     },
     spawn: () => {
-        // const audio = new Audio('/sounds/spawn.mp3');
-        // audio.volume = 0.2;
-        // audio.play().catch(e => {});
+        synthBeep(1500, 'sine', 0.05, 0.075);
+        setTimeout(() => synthBeep(2000, 'sine', 0.15, 0.075), 40); // Solid holographic ping
     },
     click: () => {
-        // const audio = new Audio('/sounds/click.mp3');
-        // audio.play().catch(e => {});
+        synthBeep(800, 'triangle', 0.1, 0.075);
+        setTimeout(() => synthBeep(1200, 'sine', 0.15, 0.075), 40); // Unfolding data sequence
     }
 };
 
 // --- THREE.JS SETUP ---
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x050505, 0.008);
+scene.fog = new THREE.FogExp2(0x020c18, 0.007); // Deep-space blue fog matches animated background
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
 camera.position.set(0, 0, 100);
@@ -45,6 +69,7 @@ camera.position.set(0, 0, 100);
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0x000000, 0); // Fully transparent canvas — CSS background shows through
 document.getElementById('canvas-container').appendChild(renderer.domElement);
 
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -193,9 +218,9 @@ function createHexShape(radius, cornerRadius = 1.6) {
     return shape;
 }
 
-function createTextTexture(text) {
+function createTextTexture(text, subText) {
     const canvas = document.createElement('canvas');
-    const size = 256;
+    const size = 512; // Higher res for sharper text
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
@@ -203,19 +228,39 @@ function createTextTexture(text) {
     ctx.fillStyle = 'rgba(0,0,0,0)';
     ctx.fillRect(0, 0, size, size);
 
-    ctx.font = 'bold 30px Orbitron, sans-serif';
-    ctx.textAlign = 'center';
+    // Subtle cyan glow behind text
+    ctx.shadowColor = 'rgba(0, 210, 255, 0.55)';
+    ctx.shadowBlur = 12;
+
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = CONFIG.colors.text;
-    ctx.shadowBlur = 0; // Removed glow
+    
+    if (subText) {
+        // Draw Main Text
+        ctx.font = 'bold 52px Sansation, Orbitron, sans-serif';
+        ctx.fillStyle = CONFIG.colors.text;
+        const words = text.split(' ');
+        if (words.length > 2) {
+            ctx.fillText(words.slice(0, Math.ceil(words.length / 2)).join(' '), size / 2, size / 2 - 58);
+            ctx.fillText(words.slice(Math.ceil(words.length / 2)).join(' '), size / 2, size / 2 + 2);
+        } else {
+            ctx.fillText(text, size / 2, size / 2 - 28);
+        }
 
-    const words = text.split(' ');
-    if (words.length > 2) {
-        ctx.fillText(words.slice(0, Math.ceil(words.length / 2)).join(' '), size / 2, size / 2 - 20);
-        ctx.fillText(words.slice(Math.ceil(words.length / 2)).join(' '), size / 2, size / 2 + 20);
+        // Draw Sub Text
+        ctx.font = '32px Sansation, Orbitron, sans-serif';
+        ctx.fillStyle = '#88ddff'; // Slightly dimmed/cyan for subtext
+        ctx.fillText(subText, size / 2, size / 2 + 58);
     } else {
-        ctx.fillText(text, size / 2, size / 2);
+        ctx.font = 'bold 52px Sansation, Orbitron, sans-serif';
+        ctx.fillStyle = CONFIG.colors.text;
+        const words = text.split(' ');
+        if (words.length > 2) {
+            ctx.fillText(words.slice(0, Math.ceil(words.length / 2)).join(' '), size / 2, size / 2 - 38);
+            ctx.fillText(words.slice(Math.ceil(words.length / 2)).join(' '), size / 2, size / 2 + 38);
+        } else {
+            ctx.fillText(text, size / 2, size / 2);
+        }
     }
 
     return new THREE.CanvasTexture(canvas);
@@ -229,6 +274,41 @@ function hexToPixel(q, r, radius) {
 
 // --- NODE CLASS ---
 
+let panTipShown = false;
+function triggerPanTip() {
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (panTipShown || isTouchDevice) return;
+    panTipShown = true;
+    
+    const tip = document.createElement('div');
+    tip.innerText = "Tip: Right-click and drag to pan the view";
+    Object.assign(tip.style, {
+        position: 'fixed',
+        bottom: '80px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        padding: '12px 24px',
+        background: 'rgba(2, 8, 28, 0.75)',
+        backdropFilter: 'blur(16px)',
+        border: '1px solid rgba(0, 255, 255, 0.3)',
+        color: '#00ffff',
+        fontFamily: 'Sansation, Orbitron, sans-serif',
+        fontSize: '14px',
+        borderRadius: '8px',
+        pointerEvents: 'none',
+        opacity: '0',
+        transition: 'opacity 0.6s ease',
+        zIndex: '1000',
+        boxShadow: '0 0 15px rgba(0, 255, 255, 0.15)',
+        textAlign: 'center'
+    });
+    document.body.appendChild(tip);
+    
+    setTimeout(() => { tip.style.opacity = '1'; }, 500);
+    setTimeout(() => { tip.style.opacity = '0'; }, 5500);
+    setTimeout(() => { tip.remove(); }, 6200);
+}
+
 class HexNode {
     constructor(data, q, r, parent = null, level = 0) {
         this.data = data;
@@ -240,6 +320,9 @@ class HexNode {
         this.expanded = false;
         this.level = level;
 
+        // Determine if node is clickable
+        this.isInteractive = (this.data.children && this.data.children.length > 0) || this.data.image || this.data.url || this.data.link || this.data.type === 'overflow';
+
         // Static Color (Uniform Light Blue Veil)
         this.defaultColor = new THREE.Color(CONFIG.colors.default);
 
@@ -249,29 +332,42 @@ class HexNode {
         this.baseMaterial = new THREE.MeshBasicMaterial({
             color: this.defaultColor,
             transparent: true,
-            opacity: 0.6, // Higher opacity for brighter hologram
+            opacity: this.isInteractive ? 0.22 : 0.15, // Non-interactive nodes are barely visible glass
             side: THREE.DoubleSide,
             depthWrite: false,
-            blending: THREE.AdditiveBlending
+            blending: THREE.NormalBlending
         });
 
         if (this.data.image) {
+            // Fix UVs: ShapeGeometry auto-generates UVs from bounding box, which
+            // is non-square for a hex (~1.15:1). Recompute to use uniform scale so
+            // the texture is sampled with correct aspect ratio.
+            const uvAttr = geometry.getAttribute('uv');
+            const hexR = CONFIG.hexRadius - 0.5; // Same radius used for the shape
+            for (let i = 0; i < uvAttr.count; i++) {
+                const posX = geometry.getAttribute('position').getX(i);
+                const posY = geometry.getAttribute('position').getY(i);
+                // Map position [-hexR, hexR] → UV [0, 1] using same scale for both axes
+                uvAttr.setXY(i, posX / (2 * hexR) + 0.5, posY / (2 * hexR) + 0.5);
+            }
+            uvAttr.needsUpdate = true;
+
             const loader = new THREE.TextureLoader();
             loader.load(this.data.image, (texture) => {
                 texture.colorSpace = THREE.SRGBColorSpace;
 
-                // Cover Logic
+                // Cover-fit: scale the texture so it fills the hex without gaps,
+                // cropping the longer dimension and centering.
                 const imageAspect = texture.image.width / texture.image.height;
-                const targetAspect = 1.1547; // Hex aspect ratio roughly
-
-                if (imageAspect > targetAspect) {
-                    texture.repeat.set(targetAspect / imageAspect, 1);
+                if (imageAspect > 1) {
+                    // Landscape image: height fills, width is cropped
+                    texture.repeat.set(1 / imageAspect, 1);
                     texture.offset.x = (1 - texture.repeat.x) / 2;
                 } else {
-                    texture.repeat.set(1, imageAspect / targetAspect);
+                    // Portrait / square image: width fills, height is cropped
+                    texture.repeat.set(1, imageAspect);
                     texture.offset.y = (1 - texture.repeat.y) / 2;
                 }
-                texture.center.set(0.5, 0.5);
 
                 // Apply to material
                 this.baseMaterial.map = texture;
@@ -286,12 +382,13 @@ class HexNode {
 
         // Overflow Node specific styling
         if (this.data.type === 'overflow') {
-            this.baseMaterial.color.setHex(0xffaa00); // Orange for 'More'
-            this.baseMaterial.opacity = 0.5;
+            this.baseMaterial.color.setHex(0xffaa00);
+            this.baseMaterial.opacity = 0.22;
         }
 
         const edges = new THREE.EdgesGeometry(geometry);
-        const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8 });
+        const lineOpacity = this.isInteractive ? 0.65 : 0.5; // Dim border for non-interactive
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: lineOpacity });
         this.border = new THREE.LineSegments(edges, lineMaterial);
 
         this.mesh = new THREE.Mesh(geometry, this.baseMaterial);
@@ -302,21 +399,37 @@ class HexNode {
         // Glow Border (Extra layer for glow effect)
         const glowGeometry = new THREE.EdgesGeometry(geometry);
         const glowMaterial = new THREE.LineBasicMaterial({
-            color: 0x00ffff,
+            color: 0x00d4ff,
             transparent: true,
-            opacity: 0.3
+            opacity: this.isInteractive ? 0.35 : 0 // No glow halo for leaf nodes
         });
         const glowBorder = new THREE.LineSegments(glowGeometry, glowMaterial);
-        glowBorder.scale.set(1.05, 1.05, 1.05); // Slightly larger
+        glowBorder.scale.set(1.06, 1.06, 1.06);
         this.mesh.add(glowBorder);
-        this.glowBorder = glowBorder; // Reference for animation
+        this.glowBorder = glowBorder;
+
+        // Elevation shadow — dark hex behind the face, makes it feel like
+        // a frosted glass tile hovering above the aurora background
+        const shadowGeo = new THREE.ShapeGeometry(createHexShape(CONFIG.hexRadius + 0.8));
+        const shadowMat = new THREE.MeshBasicMaterial({
+            color: 0x010818,
+            transparent: true,
+            opacity: this.isInteractive ? 0.65 : 0.2, // Flatter shadow for leaf nodes
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.NormalBlending
+        });
+        const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+        shadowMesh.position.z = -4; // Set behind the hex face
+        this.mesh.add(shadowMesh);
+        this.shadowMesh = shadowMesh;
 
         // Label
         // Only show label if NOT standard image, or if explicitly requested.
         // But for "More..." node (overflow), definitely show label.
 
         if (!this.data.image || this.data.type === 'overflow') {
-            const textTexture = createTextTexture(data.label);
+            const textTexture = createTextTexture(data.label, data.subLabel);
             const labelGeo = new THREE.PlaneGeometry(12, 12);
             const labelMat = new THREE.MeshBasicMaterial({
                 map: textTexture,
@@ -347,9 +460,9 @@ class HexNode {
         SOUNDS.spawn();
         this.mesh.visible = true;
         gsap.to(this.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.5, ease: "back.out(1.7)" });
-        // Target opacity 0.6 for NormalBlending, 1.0 for images if set
-        // Target opacity 0.6 for brighter Hologram, 1.0 for images if set
-        const targetOpacity = this.data.image ? 1 : 0.6;
+        // Target opacity varies by type
+        let targetOpacity = this.isInteractive ? 0.22 : 0.05;
+        if (this.data.image) targetOpacity = 1;
         gsap.to(this.baseMaterial, { opacity: targetOpacity, duration: 1 });
     }
 
@@ -367,6 +480,8 @@ class HexNode {
     }
 
     hover(isHovering) {
+        if (!this.isInteractive) return; // Do nothing for leaf nodes
+
         const cursor = document.querySelector('.custom-cursor');
         if (isHovering) {
             if (cursor) cursor.classList.add('cursor-hover');
@@ -382,7 +497,7 @@ class HexNode {
                     b: hoverColor.b,
                     duration: 0.2
                 });
-                gsap.to(this.baseMaterial, { opacity: 0.4, duration: 0.2 });
+                gsap.to(this.baseMaterial, { opacity: 0.42, duration: 0.2 }); // Brighten on hover
             } else {
                 gsap.to(this.baseMaterial, { opacity: 1, duration: 0.2 });
             }
@@ -404,7 +519,7 @@ class HexNode {
                     b: targetColor.b,
                     duration: 0.2
                 });
-                gsap.to(this.baseMaterial, { opacity: 0.6, duration: 0.2 });
+                gsap.to(this.baseMaterial, { opacity: 0.22, duration: 0.2 }); // Return to glass opacity
             } else {
                 gsap.to(this.baseMaterial, { opacity: 1, duration: 0.2 });
             }
@@ -422,8 +537,8 @@ class HexNode {
             return;
         }
 
-        if (this.data.url) {
-            window.open(this.data.url, '_blank');
+        if (this.data.url || this.data.link) {
+            window.open(this.data.url || this.data.link, '_blank');
             return;
         }
         if (this.expanded) {
@@ -519,124 +634,246 @@ class HexNode {
     }
 
     openPreview() {
-        this.createInfinityMirror(); // Add effect
         if (isPreviewOpen) return;
-        isPreviewOpen = true; // Lock interactions
+        
+        if (hoveredNode) {
+            hoveredNode.hover(false);
+            hoveredNode = null;
+        }
 
-        // Create a separate mesh for preview to avoid messing up the grid node too much
-        const geometry = new THREE.PlaneGeometry(5, 5); // Aspect ratio? Square for now or check texture?
-        // Reuse texture
-        const material = new THREE.MeshBasicMaterial({
-            map: this.baseMaterial.map,
-            transparent: true,
-            side: THREE.DoubleSide
-        });
+        this.createInfinityMirror();
+        isPreviewOpen = true;
 
-        const previewMesh = new THREE.Mesh(geometry, material);
-
-        // Start at node position
-        const worldPos = new THREE.Vector3();
-        this.mesh.getWorldPosition(worldPos);
-        previewMesh.position.copy(worldPos);
-
-        // Start rotation matches camera to start with? Or node?
-        // Let's start with node rotation? No, grid might be tilted.
-        // Start flat to camera but small?
-        previewMesh.lookAt(camera.position);
-
-        scene.add(previewMesh);
-
-        // Target Position: In front of camera.
-        // Camera is looking down -Z usually or at target.
-        // We want it fixed relative to camera.
-        const dist = 20;
-        const targetPos = new THREE.Vector3(0, 0, -dist);
-        targetPos.applyMatrix4(camera.matrixWorld);
-
-        // Calc size to fit screen at dist
-        // vFOV = camera.fov (degrees)
-        // visible height = 2 * tan(fov/2) * dist
-        const vFOV = THREE.MathUtils.degToRad(camera.fov);
-        const height = 2 * Math.tan(vFOV / 2) * dist;
-        const width = height * camera.aspect;
-
-        // Target Scale: Fit within 80% of screen
-        // Initial geometry is size 5.
-        // We need padding.
-        const scaleH = (height * 0.8) / 5;
-        const scaleW = (width * 0.8) / 5;
-        const targetScale = Math.min(scaleH, scaleW);
-
-        // Animate Position
-        gsap.to(previewMesh.position, {
-            x: targetPos.x,
-            y: targetPos.y,
-            z: targetPos.z,
-            duration: 0.5,
-            ease: "back.out(1.0)"
-        });
-
-        // Animate Rotation to match Camera (perfectly flat)
-        const targetQuaternion = camera.quaternion.clone();
-        gsap.to(previewMesh.quaternion, {
-            x: targetQuaternion.x,
-            y: targetQuaternion.y,
-            z: targetQuaternion.z,
-            w: targetQuaternion.w,
-            duration: 0.5
-        });
-
-        // Animate Scale
-        gsap.to(previewMesh.scale, {
-            x: targetScale,
-            y: targetScale,
-            z: targetScale,
-            duration: 0.5
-        });
-
-        this.previewMesh = previewMesh; // Store Ref
-
-        // Show Close Button
+        // Show the close button immediately (before texture loads)
         let closeBtn = document.getElementById('preview-close-btn');
         if (!closeBtn) {
             closeBtn = document.createElement('button');
             closeBtn.id = 'preview-close-btn';
-            closeBtn.innerText = 'X';
+            closeBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
             Object.assign(closeBtn.style, {
                 position: 'fixed',
-                top: '20px',
-                right: '20px',
-                zIndex: '9999', // Ensure extremely high Z-Index
-                padding: '10px 20px',
-                fontSize: '20px',
-                background: 'rgba(0, 0, 0, 0.8)',
+                top: '40px',
+                right: '40px',
+                width: '60px',
+                height: '60px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: '9999',
+                background: 'rgba(2, 8, 28, 0.5)',
+                backdropFilter: 'blur(16px) saturate(160%)',
+                webkitBackdropFilter: 'blur(16px) saturate(160%)',
                 color: '#00ffff',
-                border: '1px solid #00ffff',
-                cursor: 'pointer',
-                borderRadius: '5px'
+                border: '1px solid rgba(0, 255, 255, 0.35)',
+                borderRadius: '50%',
+                boxShadow: '0 0 20px rgba(0,255,255,0.2), inset 0 0 10px rgba(0,255,255,0.1)',
+                cursor: 'none',
+                transition: 'all 0.3s cubic-bezier(0.25, 1, 0.5, 1)'
             });
             document.body.appendChild(closeBtn);
-            closeBtn.addEventListener('click', (e) => {
-                e.preventDefault(); // Stop propagation issues
-                e.stopPropagation();
-                if (this.previewMesh) this.closePreview();
+            closeBtn.addEventListener('mouseenter', () => {
+                const cursor = document.querySelector('.custom-cursor');
+                if (cursor) cursor.classList.add('cursor-hover');
+                closeBtn.style.background = 'rgba(0, 255, 255, 0.15)';
+                closeBtn.style.boxShadow = '0 0 30px rgba(0, 255, 255, 0.5), inset 0 0 20px rgba(0, 255, 255, 0.3)';
+                closeBtn.style.transform = 'scale(1.1) rotate(90deg)';
+                if (typeof SOUNDS !== 'undefined' && SOUNDS.hover) SOUNDS.hover();
+            });
+            closeBtn.addEventListener('mouseleave', () => {
+                const cursor = document.querySelector('.custom-cursor');
+                if (cursor) cursor.classList.remove('cursor-hover');
+                closeBtn.style.background = 'rgba(2, 8, 28, 0.5)';
+                closeBtn.style.boxShadow = '0 0 20px rgba(0, 255, 255, 0.2), inset 0 0 10px rgba(0, 255, 255, 0.1)';
+                closeBtn.style.transform = 'scale(1) rotate(0deg)';
             });
         }
-        closeBtn.style.display = 'block';
+        closeBtn.style.transform = 'scale(1) rotate(0deg)';
+        closeBtn.style.display = 'flex';
+
+        this.isPreviewCancelled = false;
+
+        closeBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (this.previewGroup) {
+                this.closePreview();
+            } else {
+                this.isPreviewCancelled = true;
+                isPreviewOpen = false;
+                closeBtn.style.display = 'none';
+                this.removeInfinityMirror();
+            }
+        };
+
+        // Load a FRESH texture — no hex cover UV repeat/offset, so the image
+        // is displayed uncropped at its natural aspect ratio
+        const loader = new THREE.TextureLoader();
+        loader.load(
+            this.data.image,
+            (texture) => {
+                if (this.isPreviewCancelled) {
+                    texture.dispose();
+                    return;
+                }
+                
+                texture.colorSpace = THREE.SRGBColorSpace;
+
+                const imgAspect = texture.image.width / texture.image.height;
+
+                // Build shape with the image's natural aspect ratio
+                const planeH = 5;
+                const planeW = planeH * imgAspect;
+                
+                const createRoundedRectShape = (width, height, radius) => {
+                    const ctx = new THREE.Shape();
+                    const x = -width / 2, y = -height / 2;
+                    ctx.moveTo(x, y + radius);
+                    ctx.lineTo(x, y + height - radius);
+                    ctx.quadraticCurveTo(x, y + height, x + radius, y + height);
+                    ctx.lineTo(x + width - radius, y + height);
+                    ctx.quadraticCurveTo(x + width, y + height, x + width, y + height - radius);
+                    ctx.lineTo(x + width, y + radius);
+                    ctx.quadraticCurveTo(x + width, y, x + width - radius, y);
+                    ctx.lineTo(x + radius, y);
+                    ctx.quadraticCurveTo(x, y, x, y + radius);
+                    return ctx;
+                };
+
+                const roundedImageShape = createRoundedRectShape(planeW, planeH, 0.4);
+                const geometry = new THREE.ShapeGeometry(roundedImageShape);
+                
+                // Fix UVs so image isn't squashed or misaligned
+                const uvAttr = geometry.getAttribute('uv');
+                for (let i = 0; i < uvAttr.count; i++) {
+                    const posX = geometry.getAttribute('position').getX(i);
+                    const posY = geometry.getAttribute('position').getY(i);
+                    uvAttr.setXY(i, (posX + planeW/2) / planeW, (posY + planeH/2) / planeH);
+                }
+                uvAttr.needsUpdate = true;
+
+                const material = new THREE.MeshBasicMaterial({
+                    map: texture,
+                    transparent: true,
+                    side: THREE.DoubleSide
+                });
+                material.opacity = 0;
+
+                const previewMesh = new THREE.Mesh(geometry, material);
+
+                // Start at node world position
+                const worldPos = new THREE.Vector3();
+                this.mesh.getWorldPosition(worldPos);
+                
+                const previewGroup = new THREE.Group();
+                previewGroup.position.copy(worldPos);
+                previewGroup.quaternion.copy(camera.quaternion);
+                
+                // OS-style unfolding: start flattened
+                previewGroup.scale.set(0.01, 0.01, 1);
+
+                previewMesh.position.set(0, 0, 0);
+                previewGroup.add(previewMesh);
+
+                // Frame
+                const frameShape = createRoundedRectShape(planeW + 0.15, planeH + 0.15, 0.45);
+                const frameGeo = new THREE.EdgesGeometry(new THREE.ShapeGeometry(frameShape));
+                const frameMat = new THREE.LineBasicMaterial({
+                    color: 0x00ffff,
+                    transparent: true,
+                    opacity: 0,
+                    blending: THREE.AdditiveBlending
+                });
+                const frameMesh = new THREE.LineSegments(frameGeo, frameMat);
+                previewGroup.add(frameMesh);
+
+                // Backdrop for contrast
+                const bgShape = createRoundedRectShape(planeW + 0.4, planeH + 0.4, 0.5);
+                const bgGeo = new THREE.ShapeGeometry(bgShape);
+                const bgMat = new THREE.MeshBasicMaterial({
+                    color: 0x010818,
+                    transparent: true,
+                    opacity: 0,
+                    depthWrite: false
+                });
+                const bgMesh = new THREE.Mesh(bgGeo, bgMat);
+                bgMesh.position.z = -0.1;
+                previewGroup.add(bgMesh);
+
+                scene.add(previewGroup);
+                this.previewGroup = previewGroup;
+                this.previewMesh = previewMesh;
+
+                // Compute target position (centred in front of camera)
+                const dist = 20;
+                const targetPos = new THREE.Vector3(0, 0, -dist);
+                targetPos.applyMatrix4(camera.matrixWorld);
+
+                // Fit within 80 % of screen while preserving aspect ratio
+                const vFOV = THREE.MathUtils.degToRad(camera.fov);
+                const screenH = 2 * Math.tan(vFOV / 2) * dist;
+                const screenW = screenH * camera.aspect;
+                const scaleH = (screenH * 0.8) / planeH;
+                const scaleW = (screenW * 0.8) / planeW;
+                const targetScale = Math.min(scaleH, scaleW);
+
+                // Animate in using OS-style unfold
+                const tl = gsap.timeline();
+                
+                // Step 1: Move to center while expanding horizontally to form a line
+                tl.to(previewGroup.position, {
+                    x: targetPos.x, y: targetPos.y, z: targetPos.z,
+                    duration: 0.4, ease: 'power3.out'
+                }, 0);
+                tl.to(previewGroup.quaternion, {
+                    x: camera.quaternion.x, y: camera.quaternion.y,
+                    z: camera.quaternion.z, w: camera.quaternion.w,
+                    duration: 0.4
+                }, 0);
+                tl.to(previewGroup.scale, {
+                    x: targetScale,
+                    duration: 0.3, ease: 'power3.out'
+                }, 0);
+                
+                // Fade in frame during extension
+                tl.to(frameMat, { opacity: 0.8, duration: 0.2 }, 0);
+                
+                // Step 2: Unfold vertically like a screen turning on/window expanding
+                tl.to(previewGroup.scale, {
+                    y: targetScale + 0.05, // Slight overshoot
+                    z: targetScale,
+                    duration: 0.3, ease: 'power3.out'
+                }, 0.25);
+                tl.to(previewGroup.scale, {
+                    y: targetScale, // Settle
+                    duration: 0.2, ease: 'power2.inOut'
+                }, 0.55);
+                
+                // Fade in image and backdrop as it unfolds
+                tl.to(bgMat, { opacity: 0.8, duration: 0.3 }, 0.2);
+                tl.to(material, { opacity: 1, duration: 0.3 }, 0.25);
+            },
+            undefined,
+            () => {
+                // Texture failed to load
+                console.warn('Preview image failed to load:', this.data.image);
+                isPreviewOpen = false;
+                closeBtn.style.display = 'none';
+                this.removeInfinityMirror();
+            }
+        );
     }
 
     closePreview() {
-        if (!this.previewMesh) return;
+        if (!this.previewGroup) return;
 
         const closeBtn = document.getElementById('preview-close-btn');
         if (closeBtn) closeBtn.style.display = 'none';
 
-        // Animate back? Or just fade out?
         // Animate back to node pos is cooler
         const worldPos = new THREE.Vector3();
         this.mesh.getWorldPosition(worldPos);
 
-        gsap.to(this.previewMesh.position, {
+        gsap.to(this.previewGroup.position, {
             x: worldPos.x,
             y: worldPos.y,
             z: worldPos.z,
@@ -644,20 +881,34 @@ class HexNode {
             ease: "power2.in"
         });
 
-        gsap.to(this.previewMesh.scale, {
-            x: 0,
-            y: 0,
-            z: 0,
-            duration: 0.4,
-            onComplete: () => {
-                scene.remove(this.previewMesh);
-                this.previewMesh.geometry.dispose();
-                this.previewMesh.material.dispose();
-                this.previewMesh = null;
-                isPreviewOpen = false; // Unlock interactions
+        // Fade out children materials
+        this.previewGroup.children.forEach(child => {
+            if (child.material) {
+                 gsap.to(child.material, { opacity: 0, duration: 0.3 });
             }
         });
-        this.removeInfinityMirror(); // Remove effect
+
+        gsap.to(this.previewGroup.scale, {
+            x: 0, y: 0, z: 0,
+            duration: 0.4,
+            onComplete: () => {
+                scene.remove(this.previewGroup);
+                
+                this.previewGroup.children.forEach(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (child.material.map) child.material.map.dispose();
+                        child.material.dispose();
+                    }
+                });
+
+                this.previewMesh = null;
+                this.previewGroup = null;
+                isPreviewOpen = false;
+            }
+        });
+        
+        this.removeInfinityMirror();
     }
 
     expand() {
@@ -674,8 +925,11 @@ class HexNode {
             duration: 0.3
         });
 
-        // Hide siblings
-        if (this.parent) {
+
+
+        // Overflow nodes expand inline — don't hide siblings that are already visible.
+        // Only regular nodes should collapse/hide their siblings on expand.
+        if (this.parent && this.data.type !== 'overflow') {
             this.parent.childrenNodes.forEach(sibling => {
                 if (sibling !== this) {
                     if (sibling.expanded) sibling.collapse();
@@ -684,31 +938,70 @@ class HexNode {
             });
         }
 
-        const neighbors = [
+        const itemsToDisplay = this.data.children;
+        
+        if (this.level === 1) {
+            triggerPanTip();
+        }
+
+        const totalItems = itemsToDisplay.length;
+
+        const availableSlots = [];
+
+        // A slot is occupied if any visible node is there
+        const isSlotOccupied = (q, r) => {
+            for (let node of nodesMap.values()) {
+                if (node.q === q && node.r === r) {
+                    // Regular nodes collapse their siblings when expanded, freeing up that slot visually.
+                    // Overflow ('...') nodes expand inline, meaning their siblings stay strictly visible!
+                    const isHidingSibling = this.data.type !== 'overflow' && 
+                                            this.parent && 
+                                            this.parent.childrenNodes.includes(node) && 
+                                            node !== this;
+                                            
+                    if (node.mesh.visible && !isHidingSibling) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        };
+
+        const neighborsOffsets = [
             { q: +1, r: 0 }, { q: +1, r: -1 }, { q: 0, r: -1 },
             { q: -1, r: 0 }, { q: -1, r: +1 }, { q: 0, r: +1 }
         ];
 
-        // Determine available slots
-        const availableSlots = [];
-        for (let offset of neighbors) {
-            const targetQ = this.q + offset.q;
-            const targetR = this.r + offset.r;
-            const key = `${targetQ},${targetR}`;
-            if (!occupiedGrids.has(key)) {
-                availableSlots.push({ q: targetQ, r: targetR });
+        // Ensure newly placed children spawn contiguously (bunch together) instead of 
+        // randomly surrounding the parent node. We do this by finding the relative 
+        // coordinate of the parent node and beginning our placement rotation 
+        // exactly ONE hex past it.
+        let startIndex = 0;
+        if (this.parent) {
+            const pq = this.parent.q - this.q;
+            const pr = this.parent.r - this.r;
+            const parentIndex = neighborsOffsets.findIndex(off => off.q === pq && off.r === pr);
+            if (parentIndex !== -1) {
+                startIndex = (parentIndex + 1) % 6;
             }
         }
 
-        const itemsToDisplay = this.data.children;
-        const totalItems = itemsToDisplay.length;
-        const maxSlots = availableSlots.length;
+        // Search ONLY the 6 immediate neighbors iteratively around the node
+        for (let i = 0; i < 6; i++) {
+            const offset = neighborsOffsets[(startIndex + i) % 6];
+            const nq = this.q + offset.q;
+            const nr = this.r + offset.r;
+            if (!isSlotOccupied(nq, nr)) {
+                availableSlots.push({ q: nq, r: nr });
+            }
+        }
 
+        const maxSlots = availableSlots.length;
         let displayCount = totalItems;
         let useOverflow = false;
 
-        // If we have more items than slots, we need to reserve one slot for "More..."
-        if (totalItems > maxSlots) {
+        // If we have more items than available adjacent slots, reserve one for "More..."
+        if (totalItems > maxSlots && maxSlots > 0) {
             displayCount = maxSlots - 1;
             useOverflow = true;
         }
@@ -777,6 +1070,10 @@ class HexNode {
                 this.baseMaterial.dispose();
                 this.border.geometry.dispose();
                 this.border.material.dispose();
+                if (this.shadowMesh) {
+                    this.shadowMesh.geometry.dispose();
+                    this.shadowMesh.material.dispose();
+                }
                 if (this.labelMesh) {
                     this.labelMesh.geometry.dispose();
                     this.labelMesh.material.map.dispose();
@@ -807,6 +1104,12 @@ init();
 
 // --- EVENTS ---
 
+const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+if (isTouchDevice) {
+    const cursor = document.querySelector('.custom-cursor');
+    if (cursor) cursor.style.display = 'none';
+}
+
 let hoveredNode = null;
 
 // Prevent context menu
@@ -827,14 +1130,15 @@ window.addEventListener('mousedown', (event) => {
 
 window.addEventListener('mousemove', (event) => {
     // Custom Cursor Position
-    const cursor = document.querySelector('.custom-cursor');
-    if (cursor) {
-        cursor.style.left = `${event.clientX}px`;
-        cursor.style.top = `${event.clientY}px`;
+    if (!isTouchDevice) {
+        const cursor = document.querySelector('.custom-cursor');
+        if (cursor) {
+            cursor.style.left = `${event.clientX}px`;
+            cursor.style.top = `${event.clientY}px`;
+        }
     }
 
     if (isPreviewOpen) {
-        document.body.style.cursor = 'default';
         return;
     }
 
@@ -910,21 +1214,33 @@ window.addEventListener('wheel', (event) => {
 let touchStartDist = 0;
 let lastTouchX = 0;
 let lastTouchY = 0;
+let touchStartX = 0;
+let touchStartY = 0;
+let touchStartTime = 0;
 
 window.addEventListener('touchstart', (event) => {
     if (isPreviewOpen) return;
-    if (event.touches.length === 2) {
+    if (event.touches.length === 1) {
         isPanning = true;
-        lastTouchX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
-        lastTouchY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+        touchStartX = event.touches[0].clientX;
+        touchStartY = event.touches[0].clientY;
+        lastTouchX = touchStartX;
+        lastTouchY = touchStartY;
+        touchStartTime = Date.now();
+        cameraStartPos.copy(camera.position);
     }
 });
 
 window.addEventListener('touchmove', (event) => {
-    if (isPanning && event.touches.length === 2) {
-        event.preventDefault(); // Prevent native scroll
-        const currentX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
-        const currentY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+    if (isPanning && event.touches.length === 1) {
+        const currentX = event.touches[0].clientX;
+        const currentY = event.touches[0].clientY;
+
+        // Prevent native scroll only if they actually dragged significantly
+        const dragDist = Math.hypot(currentX - touchStartX, currentY - touchStartY);
+        if (dragDist > 5) {
+            event.preventDefault();
+        }
 
         const deltaX = currentX - lastTouchX;
         const deltaY = currentY - lastTouchY;
@@ -938,9 +1254,56 @@ window.addEventListener('touchmove', (event) => {
     }
 }, { passive: false });
 
-window.addEventListener('touchend', () => {
-    if (event.touches.length < 2) {
-        isPanning = false;
+window.addEventListener('touchend', (event) => {
+    isPanning = false;
+
+    if (isPreviewOpen) return;
+
+    const touchDuration = Date.now() - touchStartTime;
+    const touch = event.changedTouches[0];
+    const moveDist = Math.hypot(touch.clientX - touchStartX, touch.clientY - touchStartY);
+
+    // If it was a quick tap with minimal finger travel (instead of a panning swipe)
+    if (touchDuration < 300 && moveDist < 10) {
+        // Manually update pointer normalized coordinates
+        mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+
+        // Treat interacting nodes separately if applicable
+        let targets = [...group.children];
+        if (hoveredNode && hoveredNode.mesh.parent === scene) {
+            targets.push(hoveredNode.mesh);
+        }
+
+        const intersects = raycaster.intersectObjects(targets);
+
+        if (intersects.length > 0) {
+            let object = intersects[0].object;
+            while (!object.userData.node && object.parent) object = object.parent;
+            
+            const node = object.userData.node;
+            if (node) {
+                // Ensure local tracking is correct
+                if (hoveredNode && hoveredNode !== node) {
+                    hoveredNode.hover(false);
+                }
+                hoveredNode = node;
+                
+                // Trigger tap
+                node.toggle();
+                
+                // Prevent synthetic mouse events (like un-cancelable duplicate physical clicks) 
+                event.preventDefault();
+            }
+        } else {
+            // Tap on empty space: clear
+            if (hoveredNode) {
+                hoveredNode.hover(false);
+                hoveredNode = null;
+            }
+        }
     }
 });
 
@@ -964,8 +1327,9 @@ function animate() {
     requestAnimationFrame(animate);
     const time = Date.now() * 0.001;
     group.position.y = Math.sin(time) * 0.5;
-    group.rotation.x = THREE.MathUtils.lerp(group.rotation.x, mouse.y * 0.05, 0.05);
-    group.rotation.y = THREE.MathUtils.lerp(group.rotation.y, mouse.x * 0.05, 0.05);
+    // Tilt tiles toward the cursor for a natural "card follow" parallax
+    group.rotation.x = THREE.MathUtils.lerp(group.rotation.x, mouse.y * 0.15, 0.05);
+    group.rotation.y = THREE.MathUtils.lerp(group.rotation.y, mouse.x * -0.15, 0.05);
 
     // Update Nodes (for infinite mirror effect)
     nodesMap.forEach(node => node.update(camera));
